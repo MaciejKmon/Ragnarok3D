@@ -1,0 +1,155 @@
+package client.util;
+
+
+import javafx.geometry.Point3D;
+
+import java.util.Random;
+
+public class Maths
+{
+
+    public Maths()
+    {
+
+    }
+
+    //Returns a random number between a and b
+    public static int getRandom(int a, int b)
+    {
+
+        return (int) java.lang.Math.round((java.lang.Math.random() * b) + a);
+    }
+
+    //returns the percentage of percentage of, duh!
+    public static double fromPercentage(double percentage, double of)
+    {
+        return (of / 100) * percentage;
+    }
+
+    //Checks if a is eps within b.
+    public static boolean almostEqual(int a, int b, int eps)
+    {
+        return java.lang.Math.abs(a - b) < eps;
+    }
+
+    //Checks if a is within eps of b, supporting decimals
+    public static boolean almostEqual(double a, double b, double eps)
+    {
+
+        return java.lang.Math.abs(a - b) < eps;
+    }
+//
+
+    //Gets the closest even number to the given integer.
+    public static int getEven(int number)
+    {
+
+        return number += (number & 1);
+    }
+
+    /**
+     * Takes integer <i>n</i> and rounds it to the nearest <i>to</i>
+     * For example, roundTo(16,5) would round to 15
+     *
+     * @param n  The number to be rounded.
+     * @param to The number to round it to.
+     * @return <i>n</i> rounded to the nearest <i>to</i>
+     */
+    public static int roundTo(int n, int to)
+    {
+        if(n < 2)
+            return (n + to) / to * to;
+        return (n + to - 1) / to * to;
+
+    }
+
+    /**
+     * @param a Original number.
+     * @param b The amount to move closer to 0.
+     * @return <i>a b</i> close to 0.
+     */
+    public static int toZero(int a, int b)
+    {
+
+        for(int i = 0; i < b; i++)
+        {
+            if(a < 0)
+            {
+                a++;
+            }
+            if(a > 0)
+            {
+                a--;
+            }
+        }
+        return a;
+    }
+
+    /**
+     * @param a Original number.
+     * @param b The amount to move closer to 0.
+     * @return <i>a b</i> close to 0.
+     */
+    public static double toZero(double a, double b)
+    {
+        if(a < 0)
+        {
+            if(a + b > 0)
+                return 0;
+            a = a + b;
+        }
+        if(a > 0)
+        {
+            if(a - b < 0)
+                return 0;
+            a = a - b;
+        }
+        return a;
+    }
+
+    /**
+     * Calculates how much a number goes past the limit, there's probably a mathematical term for this but I don't know it.
+     *
+     * @param a   Input variable.
+     * @param max Max number before it overflows to 0 and counts upward from there.
+     * @return *a*, if *a* is greater than *max* it will return how far above *max* *a* is.
+     */
+    public static int getOverflow(int a, int max)
+    {
+        if(a > max)
+            a = a - max;
+        return a;
+   }
+
+    /**
+     * <i>test</i> <marquee>test2</marquee>
+     *
+     * @param point3D Point3D
+     * @return
+     */
+    public static float[] point3DToFloatArray(Point3D point3D)
+    {
+        return new float[]{(float) point3D.getX(), (float) point3D.getY(), (float) point3D.getZ()};
+    }
+
+    /**
+     * Returns a random number with <code>length</code> decimals
+     * If <code>length</code> is greater than a integer, it will either return negative or positive Integer.MAX_VALUE.
+     * <br></br>
+     * For example, randomKey(3) is any number between -999 and 999 excluding -99 - 99.
+     *
+     * @param length of the number you want.
+     * @return A number <code>length</code> long
+     */
+    public static int randomKey(int length)
+    {
+        Random random = new Random();
+
+
+        if(random.nextBoolean())
+            return - (int) (Math.pow(10, (random.nextDouble()) + length - 1));
+
+        return (int) (Math.pow(10, (random.nextDouble()) + length - 1));
+    }
+}
+//
