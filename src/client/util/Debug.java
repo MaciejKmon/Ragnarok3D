@@ -1,6 +1,8 @@
 package client.util;
 
 
+import java.util.Arrays;
+
 public class Debug
 {
     //This way we can keep our debugs organised, and change the way debug messages are handled without having to edit millions of lines.
@@ -22,6 +24,10 @@ public class Debug
     public static void info(Object msg)
     {
         System.out.println("info: " + msg);
+    }
+    public static void info(Object... msg)
+    {
+        System.out.println(Arrays.toString(msg));
     }
 
     public static void error(Exception e)

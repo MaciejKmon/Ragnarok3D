@@ -12,11 +12,17 @@ import client.world.entities.Entity;
 import com.jogamp.common.nio.Buffers;
 import com.jogamp.opengl.util.FPSAnimator;
 import com.jogamp.opengl.util.PMVMatrix;
+import de.matthiasmann.twl.utils.PNGDecoder;
 
 import javax.media.opengl.*;
 import javax.media.opengl.awt.GLJPanel;
 import javax.media.opengl.fixedfunc.GLMatrixFunc;
 import java.awt.*;
+import java.io.BufferedInputStream;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -26,24 +32,33 @@ import java.util.HashMap;
 
 public class SceneRenderer implements GLEventListener
 {
-    public final FPSAnimator animator;
-    public final GLJPanel panel;
-    private final Dimension dimensions;
+    public  final FPSAnimator animator;
+    public  final GLJPanel    panel;
+    private final Dimension  dimensions;
 
     private static final int locPos = 1;
     private static final int locCol = 2;
 
-    private int transformMatrixLocation;
+    private int   transformMatrixLocation;
     private float theta = 0;
+    public  int   frames = 0;
 
-    private int shaderProgram;
-    public ShaderManager shaderManager = new ShaderManager();
-    int frames = 0;
+    private int                        shaderProgram;
+    public  ShaderManager              shaderManager    = new ShaderManager();
+    private static ArrayList<VertexAttribute> vertexAttributeList = new ArrayList<>();
+
     private PerformanceTest pt = new PerformanceTest();
-    private PMVMatrix pmv;
-    private float[] instanceTransform0 = new float[16];
+    private PMVMatrix       pmv;
+    private float[]         instanceTransform0 = new float[16];
+
+    private int samplerLoc;
+
+    int textures[] = new int[1];
 
     float c = 0.5f;
+
+    //Manual Uniforms for faster access.
+//    private int samplerLoc = shaderManager.getUniform("image");
 //    private FloatBuffer interleavedBuffer;
 
 //    private ArrayList
@@ -51,33 +66,10 @@ public class SceneRenderer implements GLEventListener
 
 
      float[] vertices = {
-              1,0,0,
-
-             -0.980785f,
-             0.0f,
-             0.19509f,
-
-             -0.96194f,
-             0.191342f,
-             0.19509f,
-
-             0.980785f,
-             0.19509f,
-             0.0f
-
-
-
-
-            -0.980785f,
-             0.0f,
-             0.19509f,
-
-
-             0.980785f,
-             0.19509f,
-             0.0f,
-
-             1,0,0
+             -1f, -1f, 0.5773f,
+             0f, -1f, -1.15475f,
+             1f, -1f, 0.5773f,
+             0f, 1f, 0f, 0.5f,
      };
 
     private final float[] colors = {
@@ -142,12 +134,13 @@ public class SceneRenderer implements GLEventListener
         Debug.spam("GL4.GL_VENDOR: " + gl.glGetString(GL4.GL_VENDOR));
         Debug.spam("GL4.GL_RENDERER: " + gl.glGetString(GL4.GL_RENDERER));
         Debug.spam("GL4.GL_VERSION: " + gl.glGetString(GL4.GL_VERSION));
-        Debug.spam("GL4.GL_SHADING_LANGUAGE_VERSION" + gl.glGetString(GL4.GL_SHADING_LANGUAGE_VERSION));
+        Debug.spam("GL4.GL_SHADING_LANGUAGE_VERSION: " + gl.glGetString(GL4.GL_SHADING_LANGUAGE_VERSION));
+//        Debug.spam("GL4.GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS: " + gl.glGetString(GL4.GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS));
 
-        gl.glEnable(GL.GL_CULL_FACE);
+//        gl.glEnable(GL.GL_CULL_FACE);
         gl.glEnable(GL.GL_MULTISAMPLE);
         gl.glEnable(GL.GL_LINE_SMOOTH);
-
+//        gl.glEnableClientState(gl.GL_TEXTURE_COORD_ARRAY_ADDRESS_NV);
         gl.glLineWidth(10f);
 
         int vertexShader = loadShader(FileIO.readText(Settings.Strings.vertexShaderPath.getValue()), GL4.GL_VERTEX_SHADER);
@@ -157,8 +150,10 @@ public class SceneRenderer implements GLEventListener
         gl.glAttachShader(shaderProgram, vertexShader);
         gl.glAttachShader(shaderProgram, fragmentShader);
 
-        gl.glBindAttribLocation(shaderProgram, locPos, "VertexPosition");
-        gl.glBindAttribLocation(shaderProgram, locCol, "VertexColor");
+        addVertexAttribute("VertexPosition", 3, GL.GL_FLOAT, false);
+        addVertexAttribute("VertexColor", 4, GL.GL_FLOAT, false);
+        addVertexAttribute("VertexUV", 2, GL.GL_FLOAT, false);
+
 
         gl.glLinkProgram(shaderProgram);
 
@@ -169,7 +164,10 @@ public class SceneRenderer implements GLEventListener
         System.out.println("transformMatrixLocation:" + transformMatrixLocation);
 
 
-//
+        gl.glUseProgram(shaderProgram);
+        samplerLoc = gl.glGetUniformLocation(shaderProgram, "texture_sampler");
+        gl.glUniform1i(samplerLoc, 0);
+
 
         pmv = new PMVMatrix();
         pmv.gluPerspective(70, dimensions.width / (float) dimensions.height, 0.01f, 40);
@@ -181,8 +179,93 @@ public class SceneRenderer implements GLEventListener
             addVBOO(new VBOO(subModel.floatBuffer));
 
 //        addVBOO(new VBOO(vertices, colors));
+
+//        gl.glUseProgram(shaderProgram);
+
+        initTexture();
+//        genSampler();
+
+
+    }
+    private void initTexture()
+    {
+//        samplerLoc = shaderManager.getUniform("texture1");
+        try(BufferedInputStream is = new BufferedInputStream(new FileInputStream("textures/Blender modeling.tbmi_mp43wwdq.png0.png"))){
+            //Create the PNGDecoder object and decode the texture to a buffer
+            PNGDecoder decoder = null;
+            try
+            {
+                decoder = new PNGDecoder(is);
+            }
+            catch(IOException e)
+            {
+                e.printStackTrace();
+            }
+            int width = decoder.getWidth(), height = decoder.getHeight();
+            ByteBuffer pixelData = Buffers.newDirectByteBuffer(4 * width * height);
+            decoder.decode(pixelData, 4 * width, PNGDecoder.Format.RGBA);
+            pixelData.flip();
+            //Generate and bind the texture
+            //                       num of textures
+
+//            int id = 3;
+            //              vertice id?, , 'texture offset'
+            gl.glGenTextures(1, textures, 0);
+            gl.glActiveTexture(GL.GL_TEXTURE0);
+            gl.glBindTexture(gl.GL_TEXTURE_2D, textures[0]);
+
+            //Upload the buffer's content to the VRAM
+            //check num of UVs, the order they're added/interpreted etc.
+            //Apply filters
+            int textureLevel = 4;
+            gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGBA, width, height, 0, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, pixelData);
+
+            gl.glTexParameteri(GL.GL_TEXTURE_2D, GL3.GL_TEXTURE_BASE_LEVEL, 0);
+            gl.glTexParameteri(GL.GL_TEXTURE_2D, GL3.GL_TEXTURE_MAX_LEVEL, textureLevel);
+            gl.glTexParameteri(GL.GL_TEXTURE_2D, GL3.GL_TEXTURE_SWIZZLE_R, GL3.GL_RED);
+            gl.glTexParameteri(GL.GL_TEXTURE_2D, GL3.GL_TEXTURE_SWIZZLE_G, GL3.GL_GREEN);
+
+//            gl.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_S, GL.GL_CLAMP_TO_EDGE);
+//            gl.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_WRAP_T, GL.GL_CLAMP_TO_EDGE);
+
+            gl.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_NEAREST);
+            gl.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_NEAREST);
+            gl.glTexParameteri(GL.GL_TEXTURE_2D, GL3ES3.GL_TEXTURE_SWIZZLE_B, GL3ES3.GL_BLUE);
+            gl.glTexParameteri(GL.GL_TEXTURE_2D, GL3ES3.GL_TEXTURE_SWIZZLE_A, GL3ES3.GL_ALPHA);
+
+
+
+            gl.glActiveTexture(GL.GL_TEXTURE0);
+            gl.glBindTexture(gl.GL_TEXTURE_2D, 0);
+        }
+        catch(IOException e)
+        {
+            e.printStackTrace();
+        }
     }
 
+    private void genSampler()
+    {
+        int samplerName[] = new int[1];
+        float sampleParameter[] = new float[1];
+
+//        Debug.info(Arrays.toString(samplerObjects.array()));
+//        samplerName = samplerObjects.get();
+
+        gl.glGenSamplers(1, samplerName, 0);
+        gl.glSamplerParameteri(samplerName[0], GL.GL_TEXTURE_MIN_FILTER, GL.GL_NEAREST);
+        gl.glSamplerParameteri(samplerName[0], GL.GL_TEXTURE_MAG_FILTER, GL.GL_NEAREST);
+        gl.glSamplerParameteri(samplerName[0], GL.GL_TEXTURE_WRAP_S, GL4.GL_CLAMP_TO_EDGE);
+        gl.glSamplerParameteri(samplerName[0], GL.GL_TEXTURE_WRAP_T, GL4.GL_CLAMP_TO_EDGE);
+        gl.glSamplerParameteri(samplerName[0], GL4.GL_TEXTURE_WRAP_R, GL4.GL_CLAMP_TO_EDGE);
+        gl.glSamplerParameterfv(samplerName[0], GL4.GL_TEXTURE_BORDER_COLOR, FloatBuffer.wrap(sampleParameter));
+        gl.glSamplerParameterf(samplerName[0], GL4.GL_TEXTURE_MIN_LOD, - 1000.f);
+        gl.glSamplerParameterf(samplerName[0], GL4.GL_TEXTURE_MAX_LOD, 1000.f);
+        gl.glSamplerParameterf(samplerName[0], GL4.GL_TEXTURE_LOD_BIAS, 0.0f);
+        gl.glSamplerParameteri(samplerName[0], GL4.GL_TEXTURE_COMPARE_MODE, GL4.GL_NONE);
+        gl.glSamplerParameteri(samplerName[0], GL4.GL_TEXTURE_COMPARE_FUNC, GL4.GL_LEQUAL);
+    }
+//
     private void createVertexArray()
     {
 
@@ -247,47 +330,42 @@ public class SceneRenderer implements GLEventListener
         Window.height = height;
 
     }
+
     //TODO replace vboo arraylist with entity araraylist
     @Override
     public void display(GLAutoDrawable drawable)
     {
-//        try(BufferedInputStream is = new BufferedInputStream(new FileInputStream(filePath))){
-//            //Create the PNGDecoder object and decode the texture to a buffer
-//            PNGDecoder decoder = new PNGDecoder(is);
-//            int width = decoder.getWidth(), height = decoder.getHeight();
-//            ByteBuffer pixelData = BufferUtils.createByteBuffer(4*width*height);
-//            decoder.decode(pixelData, 4*width, PNGDecoder.Format.RGBA);
-//            pixelData.flip();
-//            //Generate and bind the texture
-//            int id = GL11.glGenTextures();
-//            GL11.glBindTexture(GL11.GL_TEXTURE_2D, id);
-//            //Upload the buffer's content to the VRAM
-//            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, width, height, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixelData);
-//            //Apply filters
-//            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL11.GL_REPEAT);
-//            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL11.GL_REPEAT);
-//            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
-//            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
-//            GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
-//        }catch(IOException e){
-//            e.printStackTrace();
-
             double currentTime = System.currentTimeMillis();
 
-        theta += (currentTime - lastTime) * 0.05f;
+//        theta += (currentTime - lastTime) * 0.05f;
         lastTime = currentTime;
 
         GL4 gl = drawable.getGL().getGL4();
         gl.glClear(GL4.GL_COLOR_BUFFER_BIT | GL4.GL_DEPTH_BUFFER_BIT);
         gl.glUseProgram(shaderProgram);
+//http://i.imgur.com/pQ2VhDn.gifv
+        //http://static.naamapalmu.com/files/wb/medium/oyna0fy7.png
+        //http://i.imgur.com/Ppt6yX8.jpg
 
         for(VBOO v : vboos)
         {
-            gl.glBindVertexArray(v.vboIndex[0]);
+            try
+            {
 
+                gl.glBindSampler(0, 0);
+            }
+            catch(Exception e)
+            {
+               e.printStackTrace();
+            }
+            //info: java.nio.DirectFloatBufferU[pos=0 lim=252 cap=640]
+            gl.glBindVertexArray(v.vboIndex[0]);
+//            Debug.info(v.interleavedBuffer.toString());
             pmv.glMatrixMode(GLMatrixFunc.GL_MODELVIEW);
             pmv.glPushMatrix();
 
+
+//                gl.glUniform1i();
                 pmv.gluLookAt(Camera.eyeX, Camera.eyeY, Camera.eyeZ, Camera.centerX, Camera.centerY, Camera.centerZ, Camera.upX, Camera.upY, Camera.eyeZ);
 
                 pmv.glTranslatef(v.translateX, v.translateY, v.translateZ);
@@ -301,7 +379,14 @@ public class SceneRenderer implements GLEventListener
                 pmv.glGetFloatv(GLMatrixFunc.GL_MODELVIEW, instanceTransform0, 0);
                 gl.glUniformMatrix4fv(transformMatrixLocation, instanceTransform0.length, false, instanceTransform0, 0);
 
-                gl.glDrawArraysInstanced(GL4.GL_TRIANGLES, 0, v.interleavedBuffer.capacity() / 7, 1);
+
+//                gl.glActiveTexture();
+                gl.glActiveTexture(GL.GL_TEXTURE0);//           ,name
+                gl.glBindTexture(GL.GL_TEXTURE_2D, textures[0]);
+                //[3]Find total number of vertices by dividing by size of a vertex.
+                gl.glDrawArrays(GL4.GL_TRIANGLES, 0, v.interleavedBuffer.capacity() / 14);
+
+                gl.glBindTexture(GL.GL_TEXTURE_2D, 0);
             pmv.glPopMatrix();
 
         }
@@ -345,13 +430,58 @@ public class SceneRenderer implements GLEventListener
             uniforms.put(uniformName, location);
             return location;
         }
+
         public int getUniform(String uniformName)
         {
             // HAAAAA GAYYYYYYY
             return uniforms.get(uniformName) == null ? addUniform(uniformName) : uniforms.get(uniformName);
         }
+
+
     }
 
+    private static class VertexAttribute
+    {
+        public int index = 1;
+        public static int stride = 0;
+        private int size;
+        private int type;
+
+        private int previousStride;
+        private boolean normalized;
+
+
+        private VertexAttribute(int size, int type, boolean normalized)
+        {
+            this.size = size;
+            this.type = type;
+            this.normalized = normalized;
+
+
+            index = vertexAttributeList.size() + 1;
+            previousStride = stride;
+            //This is the size of a float * (number of attributes ever added * size of their attributes)
+            //This way, by the time the VertexAttributes are processed, the Stride will interleave them.
+            stride += Buffers.SIZEOF_FLOAT * size;
+        }
+
+
+        @Override public String toString()
+        {
+            return "VertexAttribute{" +
+                    "size=" + size +
+                    ", type=" + type +
+                    ", previousStride=" + previousStride +
+                    ", normalized=" + normalized +
+                    '}';
+        }
+    }
+
+    public void addVertexAttribute(String name, int size, int type, boolean normalized)
+    {
+        vertexAttributeList.add(new VertexAttribute(size, type, normalized));
+        gl.glBindAttribLocation(shaderProgram, vertexAttributeList.size(), name);
+    }
 
     private void addVBOO(VBOO vboo)
     {
@@ -359,23 +489,31 @@ public class SceneRenderer implements GLEventListener
         gl.glGenVertexArrays(1, vboo.vaoIndex, 0);
         gl.glBindVertexArray(vboo.vaoIndex[0]);
 
+
         vboo.vboIndex = new int[1];
 
         gl.glGenBuffers(1, vboo.vboIndex, 0);
+
         Debug.info(vboo.vboIndex[0] + " ");
         gl.glBindBuffer(GL4.GL_ARRAY_BUFFER, vboo.vboIndex[0]);
 
-        gl.glBufferData(GL4.GL_ARRAY_BUFFER, vboo.interleavedBuffer.limit() * Buffers.SIZEOF_FLOAT, vboo.interleavedBuffer, GL4.GL_STATIC_DRAW);
-
-        gl.glEnableVertexAttribArray(locPos);
+        gl.glBufferData(GL4.GL_ARRAY_BUFFER, vboo.interleavedBuffer.limit() * Buffers.SIZEOF_FLOAT,
+                vboo.interleavedBuffer, GL4.GL_STATIC_DRAW);
         gl.glEnableVertexAttribArray(locCol);
+        gl.glEnableVertexAttribArray(locPos);
 
-        int stride = Buffers.SIZEOF_FLOAT * (3 + 4);
+   //     TODO: Iterate through Vertex Attribs and set them here. Vertex Attribs will be added with just one function call and automagically loaded here.
+        for(VertexAttribute vertexAttribute : vertexAttributeList)
+        {
+            //Attribute array, each attribute contains values so an attribute of 4 values still counts as index 1.
+            gl.glEnableVertexAttribArray(vertexAttribute.index);
+            gl.glVertexAttribPointer(vertexAttribute.index, vertexAttribute.size, vertexAttribute.type,
+                    vertexAttribute.normalized, VertexAttribute.stride, vertexAttribute.previousStride);
 
-        long arg0 = Buffers.SIZEOF_FLOAT * 3;
-
-        gl.glVertexAttribPointer(locPos, 3, GL4.GL_FLOAT, false, stride, 0);
-        gl.glVertexAttribPointer(locCol, 4, GL4.GL_FLOAT, false, stride, arg0);
+            Debug.info("Enabling va " + vertexAttribute.toString());
+            Debug.info(vertexAttribute.index, vertexAttribute.size, vertexAttribute.type,
+            vertexAttribute.normalized, VertexAttribute.stride, vertexAttribute.previousStride);
+        }
         vboos.add(vboo);
     }
 
@@ -385,3 +523,6 @@ public class SceneRenderer implements GLEventListener
         gl.glBufferSubData(GL4.GL_ARRAY_BUFFER, 0, vboo.interleavedBuffer.limit() * Buffers.SIZEOF_FLOAT, vboo.interleavedBuffer);
     }
 }
+//both UDP:
+//Both tcp: 27015
+//Out UDP: 3478,4379,4380

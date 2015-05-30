@@ -151,5 +151,45 @@ public class Maths
 
         return (int) (Math.pow(10, (random.nextDouble()) + length - 1));
     }
+
+
+
+
+
+
+
+    /////////////////////////////////////////// Not really math related \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
+    public static double[] reverseArray(double[] array)
+    {
+        double copy[] = new double[array.length];
+
+        for(int i = array.length; i > 0; i--)
+        {
+            copy[i] = array[i];
+        }
+        return copy;
+    }
+
+    public static double[][] reverseArray(double[][] array)
+    {
+        return new double[][] {reverseArray(array[0]), reverseArray(array[1])};
+    }
+
+    public static float[] reverseArray(float[] array)
+    {
+        float copy[] = new float[array.length];
+
+        for(int i = array.length; i > 0; i--)
+        {
+            copy[i] = array[i];
+        }
+        return copy;
+    }
+
+    public static float[][] reverseArray(float[][] array)
+    {
+        return new float[][] {reverseArray(array[0]), reverseArray(array[1])};
+    }
 }
 //

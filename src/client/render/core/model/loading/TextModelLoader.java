@@ -164,8 +164,6 @@ public class TextModelLoader
                 parameters[parameterCount] = parameter.toString();
                 parameterCount++;
                 parameter = new StringBuilder();
-
-
             }
             else if(lineChars[j] == '|') //Know all the data now, process it.
             {
@@ -184,14 +182,12 @@ public class TextModelLoader
                 {
                     method.invoke(reader, typedParamters);
                 }
-                catch(IllegalAccessException e)
+                catch(Exception e)
                 {
                     e.printStackTrace();
+//                    Debug.info(parameters.toString());
                 }
-                catch(InvocationTargetException e)
-                {
-                    e.printStackTrace();
-                }
+
 
                 //Run the command again from where we left off(Skip the '|') and re-use data we already know (Command, first j lineChars, methodMap)
                 if(j < lineChars.length - 1 && lineChars[j + 1] == '$')
@@ -200,8 +196,14 @@ public class TextModelLoader
                     command += lineChars[j + 2];
                     j += 2;
                 }
-
-                readCommand(methodMap, command, j + 1, lineChars,reader);
+                try
+                {
+                    readCommand(methodMap, command, j + 1, lineChars,reader);
+                }
+                catch(StackOverflowError e)
+                {
+                    e.printStackTrace();
+                }
                 return;
             }
             else if(lineChars[j] == ')')
@@ -237,6 +239,8 @@ public class TextModelLoader
         }
     }
 
+
+
     private HashMap<String, Method> loadTagReader(HashMap<String, Method> readerMethodMap, Class<?extends TagReader> tagReader)
     {
         Class<?> klass = tagReader;
@@ -260,6 +264,8 @@ public class TextModelLoader
         return readerMethodMap;
     }
 }
+
+
 
 
 

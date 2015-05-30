@@ -37,9 +37,9 @@ public class Camera implements Listener, Control.keyPressEvent
         Control.addListener(Control.Key.ESC, this);
         EventHandler.addEventListener(this, this);
 
-        Camera.setEyeX(0f);
-        Camera.setEyeY(0);
-        Camera.setEyeZ(1);
+        Camera.setCenterX(0f);
+        Camera.setCenterY(0);
+        Camera.setCenterZ(2.5f);
         Camera.setUpY(1);
 
     }
@@ -161,9 +161,9 @@ public class Camera implements Listener, Control.keyPressEvent
     //My math slaves should figure this one out any day now.
     @EventSettings public void mouseEvent(MouseMoveEvent e)
     {
-        setCenterX((float) (- ( (Math.cos(Math.toRadians(e.getAimX()))) * 360) + Camera.getEyeX()));
-        setCenterY((float) (- (  (Math.tan(Math.toRadians(e.getAimY()))) * 360) + Camera.getEyeY()));
-        setCenterZ((float) (- (Math.sin(Math.toRadians(e.getAimY() + e.getAimX())) * 360) + Camera.getEyeZ()));
+        setEyeX((float) (- ( (Math.cos(Math.toRadians(e.getAimX()))) * 1) /*+ Camera.getEyeX()*/));
+        setEyeY((float) (- (  (Math.tan(Math.toRadians(e.getAimY()))) * 1) /*+ Camera.getEyeY()*/));
+        setEyeZ((float) (- (Math.sin(Math.toRadians(e.getAimY() + e.getAimX())) * 1) /*+ Camera.getEyeZ()*/));
 //        centerX = (float)e.getAimX();
 //        centerY = (float)e.getAimY();
     }
